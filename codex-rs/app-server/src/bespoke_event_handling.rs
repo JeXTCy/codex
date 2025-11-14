@@ -40,6 +40,7 @@ use codex_protocol::ConversationId;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::error;
+use tracing::warn;
 
 type JsonValue = serde_json::Value;
 
@@ -234,7 +235,6 @@ pub(crate) async fn apply_bespoke_event_handling(
                     .into_iter()
                     .map(V2ParsedCommand::from)
                     .collect(),
-                is_user_shell_command: exec_command_begin_event.is_user_shell_command,
                 aggregated_output: None,
                 exit_code: None,
                 duration_ms: None,

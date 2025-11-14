@@ -675,9 +675,6 @@ pub enum ThreadItem {
         status: CommandExecutionStatus,
         /// A best-effort parsing of the command to identify the type of command and its arguments.
         parsed_cmd: Vec<ParsedCommand>,
-        /// True when this exec was initiated directly by the user (e.g. bang command),
-        /// not by the agent/model.
-        is_user_shell_command: bool,
         aggregated_output: Option<String>,
         /// The command's exit code.
         exit_code: Option<i32>,
