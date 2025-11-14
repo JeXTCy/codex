@@ -618,6 +618,9 @@ fn error_followed_by_task_complete_produces_turn_failed() {
 #[test]
 fn exec_command_end_success_produces_completed_command_item() {
     let mut ep = EventProcessorWithJsonOutput::new(None);
+    let command = vec!["bash".to_string(), "-lc".to_string(), "echo hi".to_string()];
+    let cwd = std::env::current_dir().unwrap();
+    let parsed_cmd = Vec::new();
 
     // Begin -> no output
     let begin = event(
@@ -625,9 +628,9 @@ fn exec_command_end_success_produces_completed_command_item() {
         EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
             call_id: "1".to_string(),
             turn_id: "turn-1".to_string(),
-            command: vec!["bash".to_string(), "-lc".to_string(), "echo hi".to_string()],
-            cwd: std::env::current_dir().unwrap(),
-            parsed_cmd: Vec::new(),
+            command: command.clone(),
+            cwd: cwd.clone(),
+            parsed_cmd: parsed_cmd.clone(),
             source: ExecCommandSource::Agent,
             interaction_input: None,
         }),
@@ -654,6 +657,11 @@ fn exec_command_end_success_produces_completed_command_item() {
         EventMsg::ExecCommandEnd(ExecCommandEndEvent {
             call_id: "1".to_string(),
             turn_id: "turn-1".to_string(),
+            command,
+            cwd,
+            parsed_cmd,
+            source: ExecCommandSource::Agent,
+            interaction_input: None,
             stdout: String::new(),
             stderr: String::new(),
             aggregated_output: "hi\n".to_string(),
@@ -682,6 +690,9 @@ fn exec_command_end_success_produces_completed_command_item() {
 #[test]
 fn exec_command_end_failure_produces_failed_command_item() {
     let mut ep = EventProcessorWithJsonOutput::new(None);
+    let command = vec!["sh".to_string(), "-c".to_string(), "exit 1".to_string()];
+    let cwd = std::env::current_dir().unwrap();
+    let parsed_cmd = Vec::new();
 
     // Begin -> no output
     let begin = event(
@@ -689,9 +700,9 @@ fn exec_command_end_failure_produces_failed_command_item() {
         EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
             call_id: "2".to_string(),
             turn_id: "turn-1".to_string(),
-            command: vec!["sh".to_string(), "-c".to_string(), "exit 1".to_string()],
-            cwd: std::env::current_dir().unwrap(),
-            parsed_cmd: Vec::new(),
+            command: command.clone(),
+            cwd: cwd.clone(),
+            parsed_cmd: parsed_cmd.clone(),
             source: ExecCommandSource::Agent,
             interaction_input: None,
         }),
@@ -717,6 +728,11 @@ fn exec_command_end_failure_produces_failed_command_item() {
         EventMsg::ExecCommandEnd(ExecCommandEndEvent {
             call_id: "2".to_string(),
             turn_id: "turn-1".to_string(),
+            command,
+            cwd,
+            parsed_cmd,
+            source: ExecCommandSource::Agent,
+            interaction_input: None,
             stdout: String::new(),
             stderr: String::new(),
             aggregated_output: String::new(),
@@ -752,6 +768,11 @@ fn exec_command_end_without_begin_is_ignored() {
         EventMsg::ExecCommandEnd(ExecCommandEndEvent {
             call_id: "no-begin".to_string(),
             turn_id: "turn-1".to_string(),
+            command: Vec::new(),
+            cwd: PathBuf::from("."),
+            parsed_cmd: Vec::new(),
+            source: ExecCommandSource::Agent,
+            interaction_input: None,
             stdout: String::new(),
             stderr: String::new(),
             aggregated_output: String::new(),

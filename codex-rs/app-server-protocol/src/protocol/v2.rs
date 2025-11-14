@@ -675,6 +675,7 @@ pub enum ThreadItem {
         status: CommandExecutionStatus,
         /// A best-effort parsing of the command to identify the type of command and its arguments.
         parsed_cmd: Vec<ParsedCommand>,
+        /// The command's output, aggregated from stdout and stderr.
         aggregated_output: Option<String>,
         /// The command's exit code.
         exit_code: Option<i32>,
