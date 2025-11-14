@@ -69,6 +69,7 @@ pub(crate) async fn emit_exec_command_begin(
             ctx.turn,
             EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
                 call_id: ctx.call_id.to_string(),
+                turn_id: ctx.turn.sub_id.clone(),
                 command: command.to_vec(),
                 cwd: cwd.to_path_buf(),
                 parsed_cmd: parse_command(command),
@@ -354,6 +355,7 @@ async fn emit_exec_end(
             ctx.turn,
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: ctx.call_id.to_string(),
+                turn_id: ctx.turn.sub_id.clone(),
                 stdout,
                 stderr,
                 aggregated_output,

@@ -542,6 +542,7 @@ fn exec_approval_emits_proposed_command_and_decision_history() {
     // Trigger an exec approval request with a short, single-line command
     let ev = ExecApprovalRequestEvent {
         call_id: "call-short".into(),
+        turn_id: "turn-short".into(),
         command: vec!["bash".into(), "-lc".into(), "echo hello world".into()],
         cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         reason: Some(
@@ -585,6 +586,7 @@ fn exec_approval_decision_truncates_multiline_and_long_commands() {
     // Multiline command: modal should show full command, history records decision only
     let ev_multi = ExecApprovalRequestEvent {
         call_id: "call-multi".into(),
+        turn_id: "turn-multi".into(),
         command: vec!["bash".into(), "-lc".into(), "echo line1\necho line2".into()],
         cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         reason: Some(
@@ -636,6 +638,7 @@ fn exec_approval_decision_truncates_multiline_and_long_commands() {
     let long = format!("echo {}", "a".repeat(200));
     let ev_long = ExecApprovalRequestEvent {
         call_id: "call-long".into(),
+        turn_id: "turn-long".into(),
         command: vec!["bash".into(), "-lc".into(), long],
         cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         reason: None,
@@ -676,6 +679,7 @@ fn begin_exec_with_source(
         id: call_id.to_string(),
         msg: EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
             call_id: call_id.to_string(),
+            turn_id: "turn-1".to_string(),
             command,
             cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             parsed_cmd,
@@ -699,6 +703,7 @@ fn end_exec(chat: &mut ChatWidget, call_id: &str, stdout: &str, stderr: &str, ex
         id: call_id.to_string(),
         msg: EventMsg::ExecCommandEnd(ExecCommandEndEvent {
             call_id: call_id.to_string(),
+            turn_id: "turn-1".to_string(),
             stdout: stdout.to_string(),
             stderr: stderr.to_string(),
             aggregated_output: aggregated.clone(),
@@ -1785,6 +1790,7 @@ async fn binary_size_transcript_snapshot() {
                                 id: ev.id,
                                 msg: EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
                                     call_id: e.call_id.clone(),
+                                    turn_id: e.turn_id,
                                     command: e.command,
                                     cwd: e.cwd,
                                     parsed_cmd,
@@ -1901,6 +1907,7 @@ fn approval_modal_exec_snapshot() {
     // Inject an exec approval request to display the approval modal.
     let ev = ExecApprovalRequestEvent {
         call_id: "call-approve-cmd".into(),
+        turn_id: "turn-approve-cmd".into(),
         command: vec!["bash".into(), "-lc".into(), "echo hello world".into()],
         cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         reason: Some(
@@ -1948,6 +1955,7 @@ fn approval_modal_exec_without_reason_snapshot() {
 
     let ev = ExecApprovalRequestEvent {
         call_id: "call-approve-cmd-noreason".into(),
+        turn_id: "turn-approve-cmd-noreason".into(),
         command: vec!["bash".into(), "-lc".into(), "echo hello world".into()],
         cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         reason: None,
@@ -2157,6 +2165,7 @@ fn status_widget_and_approval_modal_snapshot() {
     // Now show an approval modal (e.g. exec approval).
     let ev = ExecApprovalRequestEvent {
         call_id: "call-approve-exec".into(),
+        turn_id: "turn-approve-exec".into(),
         command: vec!["echo".into(), "hello world".into()],
         cwd: PathBuf::from("/tmp"),
         reason: Some(
@@ -2862,6 +2871,7 @@ fn chatwidget_exec_and_status_layout_vt100_snapshot() {
         id: "c1".into(),
         msg: EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
             call_id: "c1".into(),
+            turn_id: "turn-1".into(),
             command: vec!["bash".into(), "-lc".into(), "rg \"Change Approved\"".into()],
             cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             parsed_cmd: vec![
@@ -2884,6 +2894,7 @@ fn chatwidget_exec_and_status_layout_vt100_snapshot() {
         id: "c1".into(),
         msg: EventMsg::ExecCommandEnd(ExecCommandEndEvent {
             call_id: "c1".into(),
+            turn_id: "turn-1".into(),
             stdout: String::new(),
             stderr: String::new(),
             aggregated_output: String::new(),
