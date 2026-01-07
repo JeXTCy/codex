@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-[#0b0b0f] text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Arranger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
+          colors: {
+            base: '#0b0b0f',
+            card: '#111218',
+            card2: '#181c24',
+            border: '#2b2f3a',
+            neon: '#3bc8f6',
+            accent: '#8b5cf6',
+          },
+          boxShadow: {
+            glow: '0 0 0 1px rgba(59,200,246,0.4), 0 10px 50px rgba(59,200,246,0.15)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0b0f; }
+    ::-webkit-scrollbar-thumb { background: #2b2f3a; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3bc8f6; }
+    textarea:focus, button:focus, select:focus, input:focus { outline: 2px solid #3bc8f6; outline-offset: 2px; }
+    .editor-btn {
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid #2b2f3a;
+      background: #111218;
+      color: #e0e0e0;
+      font-size: 0.875rem;
+      transition: border-color 150ms ease, transform 150ms ease;
+    }
+    .editor-btn:hover { border-color: #3bc8f6; transform: translateY(-1px); }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.0/build/midi-writer.js"></script>
+</head>
+<body class="min-h-full bg-gradient-to-b from-[#0b0b0f] via-[#0f1118] to-[#0b0b0f] text-slate-100">
+  <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <header class="sticky top-0 z-20 backdrop-blur bg-[#0b0b0f]/80 border border-border rounded-2xl px-4 py-3 shadow-xl flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-neon/80 via-accent/70 to-blue-600 shadow-glow flex items-center justify-center">
+          <span class="text-xl font-bold text-black drop-shadow">♪</span>
+        </div>
+        <div>
+          <p class="text-sm text-slate-400">KI Song-Designer</p>
+          <h1 class="text-2xl font-semibold tracking-tight">AI Arranger</h1>
+        </div>
+      </div>
+      <div class="flex gap-2" role="tablist" aria-label="Ansicht wechseln">
+        <button id="arrangerTab" role="tab" aria-selected="true" class="px-4 py-2 rounded-xl border border-border bg-card2 text-slate-100 font-semibold shadow hover:shadow-lg transition">Arranger</button>
+        <button id="editorTab" role="tab" aria-selected="false" class="px-4 py-2 rounded-xl border border-border bg-card text-slate-400 hover:text-white hover:border-slate-500 transition">ABC Editor</button>
+      </div>
+    </header>
+
+    <section id="arrangerControls" class="grid md:grid-cols-4 gap-4">
+      <div class="col-span-2 grid grid-cols-2 gap-4">
+        <label class="flex flex-col gap-2 p-4 rounded-2xl bg-card border border-border shadow">
+          <span class="text-sm text-slate-400">Genre</span>
+          <select id="genreSelect" class="bg-card2 border border-border rounded-xl px-3 py-2 focus:outline-none">
+          </select>
+        </label>
+        <label class="flex flex-col gap-2 p-4 rounded-2xl bg-card border border-border shadow">
+          <span class="text-sm text-slate-400">Mood</span>
+          <select id="moodSelect" class="bg-card2 border border-border rounded-xl px-3 py-2 focus:outline-none">
+            <option value="Happy">Happy</option>
+            <option value="Sad">Sad</option>
+            <option value="Energetic">Energetic</option>
+            <option value="Chill">Chill</option>
+          </select>
+        </label>
+      </div>
+      <label class="flex flex-col gap-2 p-4 rounded-2xl bg-card border border-border shadow">
+        <span class="text-sm text-slate-400">Länge (Faktor)</span>
+        <div class="flex items-center gap-3">
+          <input id="lengthSlider" type="range" min="2" max="12" value="6" class="w-full accent-neon">
+          <span id="lengthValue" class="text-lg font-semibold">6</span>
+        </div>
+      </label>
+      <div class="flex items-center justify-end">
+        <button id="generateBtn" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-neon via-blue-500 to-accent text-black font-semibold shadow-glow hover:scale-[1.01] transition" aria-label="Arrangement generieren">Generate</button>
+      </div>
+    </section>
+
+    <section id="arrangerView" class="space-y-4" aria-label="Arranger Ansicht">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 space-y-4">
+          <div class="p-4 rounded-2xl bg-card2 border border-border shadow">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-sm text-slate-400">Zusammenfassung</p>
+                <h2 class="text-xl font-semibold" id="summaryTitle">Bereit für KI-Zauber</h2>
+              </div>
+              <div class="flex gap-2">
+                <button id="copySummary" class="px-3 py-2 rounded-xl bg-card border border-border text-sm hover:border-neon transition" aria-label="Arrangement Text kopieren">Export Text</button>
+                <button id="downloadFullMidi" class="px-3 py-2 rounded-xl bg-gradient-to-r from-accent to-neon text-black font-semibold shadow-glow" aria-label="Gesamtes MIDI herunterladen">Full Arrangement MIDI</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+              <div class="p-3 rounded-xl bg-card border border-border">
+                <p class="text-slate-400">BPM</p>
+                <p class="text-lg font-semibold" id="summaryBpm">-</p>
+              </div>
+              <div class="p-3 rounded-xl bg-card border border-border">
+                <p class="text-slate-400">Key</p>
+                <p class="text-lg font-semibold" id="summaryKey">-</p>
+              </div>
+              <div class="p-3 rounded-xl bg-card border border-border">
+                <p class="text-slate-400">Dauer</p>
+                <p class="text-lg font-semibold" id="summaryDuration">-</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-card border border-border shadow space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold">Timeline</h3>
+              <p class="text-sm text-slate-400">Drag & Drop: zieht MIDI in die DAW</p>
+            </div>
+            <div id="timeline" class="flex gap-3 overflow-x-auto pb-2"></div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="p-4 rounded-2xl bg-card border border-border shadow space-y-3" id="detailsPanel">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold" id="detailsTitle">Details</h3>
+              <span class="px-2 py-1 text-xs rounded-full bg-card2 border border-border" id="detailsBars">-</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <p class="text-slate-400">Energy</p>
+              <div class="w-28 h-2 bg-card2 rounded-full overflow-hidden">
+                <div id="detailsEnergy" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <p class="text-sm text-slate-400">Instrumentation</p>
+              <div id="detailsInstruments" class="flex flex-wrap gap-2 mt-2"></div>
+            </div>
+            <div>
+              <p class="text-sm text-slate-400">Suggested Chord Progression</p>
+              <div id="detailsChords" class="flex flex-wrap gap-2 mt-2"></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="downloadSectionMidi" class="px-3 py-2 rounded-xl bg-card2 border border-border text-sm hover:border-neon transition" aria-label="Section MIDI herunterladen">Download Section MIDI</button>
+              <div class="relative group">
+                <span class="px-3 py-2 rounded-xl bg-card2 border border-border text-xs text-slate-300">Production Tip</span>
+                <div class="absolute left-0 mt-2 hidden group-hover:block w-64 p-3 rounded-xl bg-card border border-border shadow text-sm" id="tipText"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-card2 border border-border shadow">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold">ABC Notation (Generated)</h3>
+              <button id="copyAbc" class="text-sm text-neon">Copy</button>
+            </div>
+            <pre id="generatedAbc" class="mt-2 text-sm text-emerald-300 bg-card rounded-xl p-3 overflow-x-auto whitespace-pre-wrap"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="editorView" class="hidden space-y-4" aria-label="ABC Editor">
+      <div class="p-4 rounded-2xl bg-card border border-border shadow space-y-3">
+        <div class="flex flex-wrap gap-2 items-center">
+          <button data-action="copy" class="editor-btn">Copy</button>
+          <button data-action="paste" class="editor-btn">Paste</button>
+          <button data-action="clear" class="editor-btn">Clear</button>
+          <div class="flex gap-2">
+            <button data-example="mary" class="editor-btn">Load Mary</button>
+            <button data-example="twinkle" class="editor-btn">Twinkle</button>
+            <button data-example="happy" class="editor-btn">Happy Birthday</button>
+            <button data-example="ode" class="editor-btn">Ode</button>
+          </div>
+          <button id="randomAbc" class="editor-btn bg-card2 border border-border">Random</button>
+        </div>
+        <textarea id="abcTextarea" class="w-full h-64 bg-[#0d0f15] border border-border rounded-xl p-4 text-emerald-200 font-mono text-sm" aria-label="ABC Text"></textarea>
+        <div class="flex flex-wrap items-center gap-3">
+          <button id="playAbc" class="px-4 py-2 rounded-xl bg-gradient-to-r from-neon to-accent text-black font-semibold shadow-glow">Play</button>
+          <button id="stopAbc" class="px-3 py-2 rounded-xl bg-card2 border border-border">Stop</button>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-400">Tempo</span>
+            <input id="tempoSlider" type="range" min="60" max="240" value="120" class="accent-neon">
+            <span id="tempoValue" class="text-sm font-semibold">120 BPM</span>
+          </div>
+          <button id="downloadAbcMidi" class="px-3 py-2 rounded-xl bg-card2 border border-border">Download MIDI</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    const CONFIG = {
+      GENRES: {
+        Pop: {
+          bpmRange: [95, 115],
+          structures: [
+            ['Intro', 'Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Chorus'],
+            ['Intro', 'Verse 1', 'Pre-Chorus', 'Chorus', 'Chorus', 'Outro'],
+          ],
+          instruments: ['Vocals', 'Guitar', 'Piano', 'Synth Pad', 'Drums', 'Bass', 'Pluck'],
+          keys: ['C Major', 'G Major', 'A Minor']
+        },
+        'EDM / House': {
+          bpmRange: [122, 128],
+          structures: [
+            ['Intro', 'Build-Up', 'Drop', 'Verse 1', 'Build-Up', 'Drop', 'Breakdown', 'Outro'],
+            ['Intro', 'Build-Up', 'Drop', 'Breakdown', 'Drop', 'Outro']
+          ],
+          instruments: ['Kick', 'Snare', 'Clap', 'Pluck', 'Lead', 'Pad', 'Bassline', 'FX'],
+          keys: ['F Minor', 'D# Minor', 'C Minor']
+        },
+        Rock: {
+          bpmRange: [100, 150],
+          structures: [
+            ['Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Solo', 'Chorus', 'Outro'],
+            ['Intro', 'Verse 1', 'Chorus', 'Bridge', 'Chorus', 'Outro']
+          ],
+          instruments: ['Electric Guitar', 'Bass Guitar', 'Drums', 'Vocals', 'Organ', 'Synth'],
+          keys: ['E Minor', 'A Major', 'D Major']
+        },
+        'Lo-Fi Hip Hop': {
+          bpmRange: [70, 90],
+          structures: [
+            ['Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Outro'],
+            ['Intro', 'Verse 1', 'Breakdown', 'Verse 2', 'Outro']
+          ],
+          instruments: ['Rhodes', 'Warm Pad', 'Vinyl Crackle', 'Muted Guitar', 'Soft Drums', '808'],
+          keys: ['Bb Minor', 'C Minor', 'G Minor']
+        },
+        Cinematic: {
+          bpmRange: [80, 110],
+          structures: [
+            ['Intro', 'Build-Up', 'Verse 1', 'Bridge', 'Chorus', 'Outro'],
+            ['Intro', 'Build-Up', 'Chorus', 'Breakdown', 'Build-Up', 'Chorus', 'Outro']
+          ],
+          instruments: ['Strings', 'Brass', 'Choir', 'Taikos', 'Piano', 'Sub Boom', 'Synth'],
+          keys: ['D Minor', 'F Minor', 'C Minor']
+        },
+        'Psytrance (Goa / Full-On)': {
+          bpmRange: [138, 146],
+          structures: [
+            ['Intro', 'Build-Up', 'Drop', 'Verse 1', 'Breakdown', 'Build-Up', 'Drop', 'Outro'],
+            ['Intro', 'Drop', 'Breakdown', 'Build-Up', 'Drop', 'Outro']
+          ],
+          instruments: ['Rolling Bass', 'Kick', 'FX', 'Acid Lead', 'Pads', 'Percs', 'Atmos'],
+          keys: ['E Minor', 'F# Minor', 'A Minor']
+        },
+        'Darkpsy / Forest': {
+          bpmRange: [148, 160],
+          structures: [
+            ['Intro', 'Build-Up', 'Drop', 'Breakdown', 'Drop', 'Outro'],
+            ['Intro', 'Drop', 'Breakdown', 'Drop', 'Outro']
+          ],
+          instruments: ['FM Lead', 'Heavy Kick', 'Psy Bass', 'Percs', 'Textures', 'FX'],
+          keys: ['E Phrygian', 'D Phrygian', 'F Minor']
+        },
+        'ProgPsy / Twilight': {
+          bpmRange: [132, 142],
+          structures: [
+            ['Intro', 'Build-Up', 'Drop', 'Breakdown', 'Build-Up', 'Drop', 'Outro'],
+            ['Intro', 'Drop', 'Verse 1', 'Breakdown', 'Drop', 'Outro']
+          ],
+          instruments: ['Prog Bass', 'Kick', 'Pads', 'Stabs', 'Leads', 'FX'],
+          keys: ['G Minor', 'D Minor', 'F Minor']
+        }
+      },
+      SECTION_DETAILS: {
+        default: { color: 'from-slate-600 to-slate-800', energy: 5, bars: 8 },
+        Intro: { color: 'from-sky-500/80 to-indigo-700/70', energy: 3, bars: 8 },
+        'Verse 1': { color: 'from-emerald-500/80 to-teal-700/70', energy: 5, bars: 16 },
+        'Verse 2': { color: 'from-emerald-500/80 to-teal-700/70', energy: 6, bars: 16 },
+        'Pre-Chorus': { color: 'from-amber-400/80 to-orange-600/70', energy: 6, bars: 8 },
+        Chorus: { color: 'from-fuchsia-500/80 to-purple-700/70', energy: 8, bars: 16 },
+        Hook: { color: 'from-pink-500/80 to-rose-700/70', energy: 9, bars: 8 },
+        Drop: { color: 'from-blue-500/80 to-cyan-700/70', energy: 10, bars: 16 },
+        'Build-Up': { color: 'from-amber-500/80 to-rose-600/70', energy: 9, bars: 8 },
+        Breakdown: { color: 'from-slate-500/80 to-slate-700/70', energy: 4, bars: 8 },
+        Bridge: { color: 'from-lime-500/80 to-green-700/70', energy: 6, bars: 8 },
+        Solo: { color: 'from-indigo-400/80 to-indigo-700/70', energy: 7, bars: 12 },
+        Outro: { color: 'from-slate-600/80 to-slate-800/70', energy: 2, bars: 8 }
+      },
+      PRODUCTION_TIPS: [
+        'Nutze Sidechain auf Pads gegen den Kick für mehr Transparenz.',
+        'Automatisiere Filter-Cutoff im Build-Up für Spannung.',
+        'Layer zwei Leads: eine breit mit Chorus, eine mittig für Fokus.',
+        'Hi-Hats leicht nach vorne schieben für mehr Drive.',
+        'Lass Breakdowns atmen: weniger Bass, mehr Texturen.',
+        'Verwende einen Riser mit steigender Rate (Pitch + Noise).',
+        'Setze Parallelkompression auf den Drums ein.',
+        'Automation der Reverb-Size im Pre-Chorus sorgt für Weite.'
+      ],
+      KEY_MAPPINGS: {
+        C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7,
+        'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11
+      },
+      SCALES: {
+        major: [0, 2, 4, 5, 7, 9, 11],
+        minor: [0, 2, 3, 5, 7, 8, 10],
+        phrygian: [0, 1, 3, 5, 7, 8, 10]
+      },
+      ROMAN_NUMERALS: {
+        major: { I: 0, ii: 1, iii: 2, IV: 3, V: 4, vi: 5, vii: 6 },
+        minor: { i: 0, ii: 1, III: 2, iv: 3, v: 4, VI: 5, VII: 6 },
+        phrygian: { i: 0, II: 1, III: 2, iv: 3, v: 4, VI: 5, vii: 6 }
+      }
+    };
+
+    const AppState = {
+      arrangement: [],
+      genre: 'Pop',
+      key: 'C Major',
+      bpm: 120,
+      activeSectionIndex: 0
+    };
+
+    const examples = {
+      mary: `X:1\nT:Mary Had a Little Lamb\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\nE D C D | E E E2 | D D D2 | E G G2 |`,
+      twinkle: `X:1\nT:Twinkle Twinkle\nM:4/4\nL:1/4\nQ:1/4=90\nK:C\nC C G G | A A G2 | F F E E | D D C2 |`,
+      happy: `X:1\nT:Happy Birthday\nM:3/4\nL:1/8\nQ:1/4=120\nK:C\nG G A | G c B3/2 | G G A | G d c3/2 |`,
+      ode: `X:1\nT:Ode to Joy\nM:4/4\nL:1/8\nQ:1/4=110\nK:C\nE E F G | G F E D | C C D E | E2 D2 |`
+    };
+
+    const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    const MusicTheory = {
+      getMidiNote(name, octave = 4) {
+        const value = CONFIG.KEY_MAPPINGS[name];
+        if (value === undefined) return 60;
+        return 12 * (octave + 1) + value;
+      },
+      getKeyData(keyString) {
+        const parts = keyString.split(' ');
+        if (parts.length === 2) {
+          return { root: parts[0], scaleType: parts[1].toLowerCase() };
+        }
+        if (parts.length === 3) {
+          return { root: parts[1], scaleType: parts[0].toLowerCase() };
+        }
+        return { root: 'C', scaleType: 'major' };
+      },
+      toAbcNote(noteName) {
+        if (noteName.includes('#')) return '^' + noteName[0];
+        if (noteName.includes('b')) return '_' + noteName[0];
+        return noteName[0];
+      },
+      midiToName(midi) {
+        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        return names[midi % 12];
+      },
+      getChordNotes(rootNoteName, scaleType, roman) {
+        const key = scaleType.toLowerCase();
+        const mapping = CONFIG.ROMAN_NUMERALS[key] || CONFIG.ROMAN_NUMERALS.major;
+        const degree = mapping[roman] ?? 0;
+        const scale = CONFIG.SCALES[key] || CONFIG.SCALES.major;
+        const baseMidi = this.getMidiNote(rootNoteName, 4);
+
+        const noteFromDegree = (deg) => {
+          const octaveOffset = Math.floor(deg / scale.length) * 12;
+          const interval = scale[deg % scale.length];
+          return baseMidi + interval + octaveOffset;
+        };
+
+        const root = noteFromDegree(degree);
+        const third = noteFromDegree(degree + 2);
+        const fifth = noteFromDegree(degree + 4);
+        return [root, third, fifth];
+      }
+    };
+
+    const Arranger = {
+      calcTotalDurationSeconds(arrangement, bpm) {
+        const totalBars = arrangement.reduce((acc, s) => acc + s.bars, 0);
+        return (totalBars * 4 / bpm) * 60;
+      },
+      formatTime(seconds) {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      },
+      generateChordProgression(key, energy) {
+        const { root, scaleType } = MusicTheory.getKeyData(key);
+        const mapping = CONFIG.ROMAN_NUMERALS[scaleType] || CONFIG.ROMAN_NUMERALS.major;
+        const romans = Object.keys(mapping);
+        const start = energy <= 3 || energy >= 8 ? romans.find(r => mapping[r] === 0) : randomChoice(romans);
+        const progression = [start];
+        for (let i = 1; i < 4; i++) progression.push(randomChoice(romans));
+        return { progression, root, scaleType };
+      },
+      pickInstruments(all, energy) {
+        const count = Math.max(2, Math.ceil(energy / 2) + 1);
+        const shuffled = [...all].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, count);
+      },
+      adjustStructure(structure, lengthVal) {
+        const base = [...structure];
+        const target = Math.max(2, Math.min(12, Math.round(base.length * (lengthVal / 6))));
+        let result = [...base];
+        if (target < result.length) {
+          result = result.slice(0, target);
+          if (!result.includes('Outro')) result.push('Outro');
+        }
+        while (result.length < target) {
+          const mid = base[Math.min(base.length - 2, Math.max(1, Math.floor(base.length / 2)))] || 'Chorus';
+          result.splice(result.length - 1, 0, mid);
+        }
+        return result;
+      },
+      generateArrangement() {
+        const genreName = document.getElementById('genreSelect').value;
+        const mood = document.getElementById('moodSelect').value;
+        const lengthVal = Number(document.getElementById('lengthSlider').value);
+        const genre = CONFIG.GENRES[genreName];
+
+        let [minBpm, maxBpm] = genre.bpmRange;
+        if (mood === 'Chill' || mood === 'Sad') { minBpm -= 5; maxBpm -= 5; }
+        if (mood === 'Energetic') { minBpm += 5; maxBpm += 5; }
+        minBpm = Math.max(60, minBpm); maxBpm = Math.min(250, maxBpm);
+        const bpm = Math.floor(minBpm + Math.random() * (maxBpm - minBpm));
+
+        const moodKeyPool = genre.keys.filter(k => {
+          if (mood === 'Sad') return k.toLowerCase().includes('minor');
+          if (mood === 'Happy') return k.toLowerCase().includes('major');
+          return true;
+        });
+        const key = randomChoice(moodKeyPool.length ? moodKeyPool : genre.keys);
+
+        const baseStructure = randomChoice(genre.structures);
+        const structure = this.adjustStructure(baseStructure, lengthVal);
+
+        const sections = structure.map((name, idx) => {
+          const details = CONFIG.SECTION_DETAILS[name] || CONFIG.SECTION_DETAILS.default;
+          const { progression, root, scaleType } = this.generateChordProgression(key, details.energy);
+          const chords = progression;
+          const instruments = this.pickInstruments(genre.instruments, details.energy);
+          return {
+            id: `${name}-${idx}-${Date.now()}`,
+            name,
+            color: details.color,
+            bars: details.bars,
+            energy: details.energy,
+            chords,
+            instruments,
+            tip: randomChoice(CONFIG.PRODUCTION_TIPS),
+            root,
+            scaleType
+          };
+        });
+
+        AppState.arrangement = sections;
+        AppState.genre = genreName;
+        AppState.key = key;
+        AppState.bpm = bpm;
+        AppState.activeSectionIndex = 0;
+        renderAll();
+      }
+    };
+
+    const AbcEngine = {
+      fromArrangement(arrangement, genre, bpm, key) {
+        if (!arrangement.length) return '';
+        const { root, scaleType } = MusicTheory.getKeyData(key);
+        const keyLine = scaleType === 'major' ? root : scaleType === 'minor' ? `${root}m` : `${root} ${scaleType}`;
+        let body = `X:1\nT:AI Arrangement - ${genre}\nM:4/4\nL:1/4\nQ:1/4=${bpm}\nK:${keyLine}\n`;
+        arrangement.forEach(sec => {
+          const { chords, bars } = sec;
+          const barsPerChord = Math.max(1, Math.floor(bars / chords.length));
+          body += `% ${sec.name} (${bars} bars)\n`;
+          const chordRootName = (roman) => {
+            const mapping = CONFIG.ROMAN_NUMERALS[sec.scaleType] || CONFIG.ROMAN_NUMERALS.major;
+            const degree = mapping[roman] ?? 0;
+            const scale = CONFIG.SCALES[sec.scaleType] || CONFIG.SCALES.major;
+            const interval = scale[degree % scale.length];
+            const name = MusicTheory.midiToName(MusicTheory.getMidiNote(sec.root, 4) + interval);
+            return MusicTheory.toAbcNote(name);
+          };
+          chords.forEach(ch => {
+            body += `"${ch}" [${chordRootName(ch)}]${barsPerChord * 4} | `;
+          });
+          body += '\n';
+        });
+        return body.trim();
+      },
+      parse(abcText) {
+        const lines = abcText.split(/\r?\n/);
+        let unit = 1/4;
+        let bpm = 120;
+        for (const l of lines) {
+          if (l.startsWith('L:')) {
+            const len = l.replace('L:', '').trim();
+            if (len.includes('/')) {
+              const [num, den] = len.split('/').map(Number);
+              unit = num / (den || 1);
+            } else {
+              unit = Number(len) || unit;
+            }
+          }
+          if (l.startsWith('Q:')) {
+            const match = l.match(/=(\d+)/);
+            if (match) bpm = Number(match[1]);
+          }
+        }
+        const noteRegex = /([_\^=]?[A-Ga-gz])([',]*)(\d+(?:\/\d+)?|\/\d+|\/)?/g;
+        const notes = [];
+        let pos = 0;
+        for (const line of lines) {
+          let m;
+          while ((m = noteRegex.exec(line)) !== null) {
+            const [ , noteRaw, octaveRaw, durRaw ] = m;
+            const isRest = noteRaw.toLowerCase() === 'z';
+            const baseNote = noteRaw.replace(/[_\^=]/, '').toUpperCase();
+            let accidental = '';
+            if (noteRaw.startsWith('^')) accidental = '#';
+            else if (noteRaw.startsWith('_')) accidental = 'b';
+
+            let octave = 4;
+            if (octaveRaw) {
+              const ups = (octaveRaw.match(/'/g) || []).length;
+              const downs = (octaveRaw.match(/,/g) || []).length;
+              octave += ups - downs;
+            }
+            let dur = unit;
+            if (durRaw) {
+              if (durRaw.includes('/')) {
+                const parts = durRaw.split('/');
+                if (parts[0] === '') dur = unit / Number(parts[1]);
+                else dur = (Number(parts[0]) / Number(parts[1] || 1)) * unit;
+              } else dur = Number(durRaw) * unit;
+            }
+            if (!isRest) {
+              notes.push({ note: baseNote + accidental + octave, start: pos, dur });
+            }
+            pos += dur;
+          }
+        }
+        return { notes, bpm };
+      }
+    };
+
+    const MidiBuilder = {
+      buildTrack(sections, bpm, key) {
+        const track = new MidiWriter.Track();
+        track.setTempo(bpm);
+        sections.forEach(sec => {
+          const barsPerChord = Math.max(1, sec.bars / sec.chords.length);
+          sec.chords.forEach(ch => {
+            const midiNotes = MusicTheory.getChordNotes(sec.root, sec.scaleType, ch);
+            const event = new MidiWriter.ChordEvent({ pitch: midiNotes.map(n => MidiBuilder.midiToPitch(n)), duration: `T${Math.round(barsPerChord * 4 * 128)}` });
+            track.addEvent(event);
+          });
+        });
+        return track;
+      },
+      midiToPitch(num) {
+        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(num / 12) - 1;
+        const note = names[num % 12];
+        return `${note}${octave}`;
+      },
+      getMidiDataUri(sections, bpm, key, name) {
+        const track = this.buildTrack(sections, bpm, key);
+        const writer = new MidiWriter.Writer(track);
+        return `audio/midi:${name}.mid:${writer.dataUri().split(',')[1]}`;
+      },
+      downloadMidi(sections, bpm, key, filename) {
+        const track = this.buildTrack(sections, bpm, key);
+        const writer = new MidiWriter.Writer(track);
+        const a = document.createElement('a');
+        a.href = writer.dataUri();
+        a.download = `${filename}.mid`;
+        a.click();
+      },
+      abcToMidi(abcText, filename) {
+        const parsed = AbcEngine.parse(abcText);
+        const track = new MidiWriter.Track();
+        track.setTempo(parsed.bpm || 120);
+        let cursor = 0;
+        parsed.notes.forEach(n => {
+          if (n.start > cursor) track.addEvent(new MidiWriter.NoteEvent({ pitch: ['R'], duration: `T${Math.round((n.start - cursor) * 128)}` }));
+          const event = new MidiWriter.NoteEvent({ pitch: [n.note], duration: `T${Math.round(n.dur * 128)}` });
+          track.addEvent(event);
+          cursor = n.start + n.dur;
+        });
+        const writer = new MidiWriter.Writer(track);
+        const a = document.createElement('a');
+        a.href = writer.dataUri();
+        a.download = `${filename}.mid`;
+        a.click();
+      }
+    };
+
+    const AudioPlayer = {
+      synth: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 }
+      }).toDestination(),
+      isPlaying: false,
+      playAbc(abcText, bpmOverride) {
+        const parsed = AbcEngine.parse(abcText);
+        const bpm = bpmOverride || parsed.bpm || 120;
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        Tone.Transport.bpm.value = bpm;
+        parsed.notes.forEach(n => {
+          const beatSec = 60 / bpm;
+          Tone.Transport.schedule(time => {
+            this.synth.triggerAttackRelease(n.note, n.dur * beatSec, time);
+          }, n.start * beatSec);
+        });
+        Tone.Transport.start();
+        this.isPlaying = true;
+      },
+      stop() {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        this.isPlaying = false;
+      }
+    };
+
+    function renderSummary() {
+      document.getElementById('summaryTitle').textContent = `${AppState.genre} Arrangement`;
+      document.getElementById('summaryBpm').textContent = `${AppState.bpm} BPM`;
+      document.getElementById('summaryKey').textContent = AppState.key;
+      const dur = Arranger.calcTotalDurationSeconds(AppState.arrangement, AppState.bpm);
+      document.getElementById('summaryDuration').textContent = Arranger.formatTime(dur);
+    }
+
+    function renderTimeline() {
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = '';
+      AppState.arrangement.forEach((sec, idx) => {
+        const card = document.createElement('div');
+        card.draggable = true;
+        card.className = `min-w-[170px] p-3 rounded-2xl border border-border bg-gradient-to-br ${sec.color} cursor-pointer transition hover:translate-y-[-2px] ${idx === AppState.activeSectionIndex ? 'shadow-glow ring-2 ring-neon/70' : 'opacity-80'}`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <p class="font-semibold">${sec.name}</p>
+            <span class="text-xs px-2 py-1 rounded-full bg-black/20 border border-white/10">${sec.bars} Bars</span>
+          </div>
+          <div class="mt-2 h-2 w-full bg-black/20 rounded-full overflow-hidden">
+            <div class="h-full bg-white/70" style="width:${sec.energy * 10}%"></div>
+          </div>
+          <p class="text-xs text-slate-100/90 mt-2 truncate">${sec.instruments.join(', ')}</p>
+        `;
+        card.addEventListener('click', () => {
+          AppState.activeSectionIndex = idx;
+          renderAll();
+        });
+        card.addEventListener('dragstart', (e) => {
+          const uri = MidiBuilder.getMidiDataUri([sec], AppState.bpm, AppState.key, `${sec.name}`);
+          e.dataTransfer.setData('DownloadURL', uri);
+        });
+        timeline.appendChild(card);
+      });
+    }
+
+    function renderDetails() {
+      const sec = AppState.arrangement[AppState.activeSectionIndex];
+      if (!sec) return;
+      document.getElementById('detailsTitle').textContent = sec.name;
+      document.getElementById('detailsBars').textContent = `${sec.bars} Bars`;
+      document.getElementById('detailsEnergy').style.width = `${sec.energy * 10}%`;
+      const inst = document.getElementById('detailsInstruments');
+      inst.innerHTML = '';
+      sec.instruments.forEach(i => {
+        const span = document.createElement('span');
+        span.className = 'px-2 py-1 rounded-lg bg-card2 border border-border text-xs';
+        span.textContent = i;
+        inst.appendChild(span);
+      });
+      const chords = document.getElementById('detailsChords');
+      chords.innerHTML = '';
+      sec.chords.forEach(c => {
+        const badge = document.createElement('span');
+        badge.className = 'px-2 py-1 rounded-lg bg-gradient-to-r from-card to-card2 border border-border text-xs font-semibold';
+        badge.textContent = c;
+        chords.appendChild(badge);
+      });
+      document.getElementById('tipText').textContent = sec.tip;
+    }
+
+    function renderAbc() {
+      const abc = AbcEngine.fromArrangement(AppState.arrangement, AppState.genre, AppState.bpm, AppState.key);
+      document.getElementById('generatedAbc').textContent = abc;
+    }
+
+    function renderAll() {
+      renderSummary();
+      renderTimeline();
+      renderDetails();
+      renderAbc();
+    }
+
+    function setupControls() {
+      const genreSelect = document.getElementById('genreSelect');
+      Object.keys(CONFIG.GENRES).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g; opt.textContent = g;
+        genreSelect.appendChild(opt);
+      });
+      genreSelect.value = AppState.genre;
+
+      document.getElementById('lengthSlider').addEventListener('input', (e) => {
+        document.getElementById('lengthValue').textContent = e.target.value;
+      });
+
+      document.getElementById('generateBtn').addEventListener('click', () => Arranger.generateArrangement());
+      document.getElementById('copySummary').addEventListener('click', () => {
+        const summaryLines = [`ARRANGEMENT (${AppState.genre} – ${AppState.bpm} BPM – ${AppState.key})`];
+        AppState.arrangement.forEach(sec => summaryLines.push(`${sec.name}: ${sec.bars} Bars | Energy ${sec.energy} | ${sec.instruments.join(', ')}`));
+        navigator.clipboard.writeText(summaryLines.join('\n'));
+        const btn = document.getElementById('copySummary');
+        btn.textContent = 'Kopiert!';
+        setTimeout(() => btn.textContent = 'Export Text', 1200);
+      });
+      document.getElementById('copyAbc').addEventListener('click', () => {
+        navigator.clipboard.writeText(document.getElementById('generatedAbc').textContent || '');
+      });
+      document.getElementById('downloadFullMidi').addEventListener('click', () => {
+        MidiBuilder.downloadMidi(AppState.arrangement, AppState.bpm, AppState.key, 'AI_Arrangement');
+      });
+      document.getElementById('downloadSectionMidi').addEventListener('click', () => {
+        const sec = AppState.arrangement[AppState.activeSectionIndex];
+        if (sec) MidiBuilder.downloadMidi([sec], AppState.bpm, AppState.key, sec.name);
+      });
+    }
+
+    function setupTabs() {
+      const arrangerTab = document.getElementById('arrangerTab');
+      const editorTab = document.getElementById('editorTab');
+      arrangerTab.addEventListener('click', () => {
+        arrangerTab.classList.add('bg-card2', 'text-slate-100');
+        editorTab.classList.remove('bg-card2');
+        editorTab.classList.add('bg-card', 'text-slate-400');
+        document.getElementById('arrangerView').classList.remove('hidden');
+        document.getElementById('arrangerControls').classList.remove('hidden');
+        document.getElementById('editorView').classList.add('hidden');
+      });
+      editorTab.addEventListener('click', () => {
+        editorTab.classList.add('bg-card2', 'text-slate-100');
+        arrangerTab.classList.remove('bg-card2');
+        arrangerTab.classList.add('bg-card', 'text-slate-400');
+        document.getElementById('arrangerView').classList.add('hidden');
+        document.getElementById('arrangerControls').classList.add('hidden');
+        document.getElementById('editorView').classList.remove('hidden');
+      });
+    }
+
+    function setupEditor() {
+      const textarea = document.getElementById('abcTextarea');
+      textarea.value = examples.mary;
+      document.querySelectorAll('.editor-btn').forEach(btn => {
+        const action = btn.dataset.action;
+        const example = btn.dataset.example;
+        if (action) {
+          btn.addEventListener('click', async () => {
+            if (action === 'copy') await navigator.clipboard.writeText(textarea.value);
+            if (action === 'paste') {
+              const txt = await navigator.clipboard.readText();
+              textarea.value = txt;
+            }
+            if (action === 'clear') textarea.value = '';
+          });
+        }
+        if (example) {
+          btn.addEventListener('click', () => textarea.value = examples[example]);
+        }
+      });
+      document.getElementById('randomAbc').addEventListener('click', () => {
+        const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+        let body = '';
+        for (let i = 0; i < 16; i++) {
+          const note = randomChoice(notes);
+          const len = Math.random() > 0.75 ? 2 : 1;
+          body += `${note}${len} `;
+          if ((i + 1) % 4 === 0) body += '| ';
+        }
+        textarea.value = `X:1\nT:Random ABC\nM:4/4\nL:1/4\nQ:1/4=120\nK:C\n${body}`;
+      });
+      document.getElementById('playAbc').addEventListener('click', () => {
+        AudioPlayer.playAbc(textarea.value, Number(document.getElementById('tempoSlider').value));
+      });
+      document.getElementById('stopAbc').addEventListener('click', () => AudioPlayer.stop());
+      const tempoSlider = document.getElementById('tempoSlider');
+      const tempoValue = document.getElementById('tempoValue');
+      tempoSlider.addEventListener('input', (e) => {
+        tempoValue.textContent = `${e.target.value} BPM`;
+        if (AudioPlayer.isPlaying) Tone.Transport.bpm.rampTo(Number(e.target.value), 0.2);
+      });
+      document.getElementById('downloadAbcMidi').addEventListener('click', () => {
+        MidiBuilder.abcToMidi(textarea.value, 'ABC_Export');
+      });
+    }
+
+    function init() {
+      setupControls();
+      setupTabs();
+      setupEditor();
+      Arranger.generateArrangement();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
