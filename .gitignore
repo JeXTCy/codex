@@ -30,7 +30,9 @@ result
 
 # cli tools
 CLAUDE.md
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 AGENTS.override.md
 
 # caches
