@@ -574,7 +574,7 @@
       getMidiDataUri(sections, bpm, key, name) {
         const track = this.buildTrack(sections, bpm, key);
         const writer = new MidiWriter.Writer(track);
-        return `audio/midi:${name}.mid:${writer.dataUri().split(',')[1]}`;
+        return `audio/midi:${name}.mid:${writer.dataUri()}`;
       },
       downloadMidi(sections, bpm, key, filename) {
         const track = this.buildTrack(sections, bpm, key);
